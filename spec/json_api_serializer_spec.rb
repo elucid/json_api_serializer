@@ -5,7 +5,8 @@ describe JsonApiSerializer do
     expect(JsonApiSerializer::VERSION).not_to be nil
   end
 
-  it 'does something useful' do
-    expect(false).to eq(true)
+  it 'has some models' do
+    expect{ Author }.to_not raise_exception
+    expect{ Post }.to_not raise_exception
   end
 end
