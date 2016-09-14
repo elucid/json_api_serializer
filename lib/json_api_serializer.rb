@@ -108,7 +108,7 @@ module JsonApiSerializer
         case [ rel.type, !!rel.options[:include] ]
         when [ :has_one, false ]
           rel_fk = "#{rel.name}_id"
-          rel_id = object.send(rel_fk)
+          rel_id = object.respond_to?(rel_fk) ? object.send(rel_fk) : object.send(rel.name).id
           rel_type = rel.name.to_s.pluralize
           rel_resource_identifier_object = { id: rel_id, type: rel_type }
 
