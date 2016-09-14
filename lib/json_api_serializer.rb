@@ -23,6 +23,10 @@ module JsonApiSerializer
       @_jas_resource_object_cache = options[:_jas_resource_object_cache] ||= ResourceObjectCache.new
     end
 
+    def scope
+      options[:scope]
+    end
+
     def included
       (_jas_included_set - _jas_data_set).map do |key|
         _jas_resource_object_cache[key]
