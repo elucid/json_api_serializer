@@ -93,7 +93,12 @@ module JsonApiSerializer
 
     def attributes
       @_attributes ||= self.class.attributes.inject({}) do |attrs, a|
-        attrs[a] = self.respond_to?(a) ? self.send(a) : object.send(a)
+        include_helper = "include_#{a}?"
+
+        unless respond_to?(include_helper) && !send(include_helper)
+          attrs[a] = respond_to?(a) ? send(a) : object.send(a)
+        end
+
         attrs
       end
     end
