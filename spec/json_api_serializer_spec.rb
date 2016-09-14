@@ -10,8 +10,6 @@ describe JsonApiSerializer do
     expect{ Post }.to_not raise_exception
   end
 
-  # TODO: describe JsonApiSerializer::Collection
-
   describe JsonApiSerializer::Model do
     context "resource identifier object default" do
       let(:author) { Author.create!(name: 'fred', email: 'fred@flintstone.org') }
@@ -327,9 +325,128 @@ describe JsonApiSerializer do
         end
 
         it "generates a JSON-API-compliant payload" do
-          expect(PostSerializerWithAuthorIncluded).to receive(:serializer_for).with(Author).and_return(AuthorSerializerForInclude)
+          expect(PostSerializerWithAuthorIncluded).to receive(:serializer_for).with(Author).and_return(AuthorSerializerForInclude).once
           expect(serializer.as_json).to eq(expected_payload)
         end
+      end
+    end
+  end
+
+  describe JsonApiSerializer::Collection do
+    context "simple collection" do
+      class PostSerializerSimple < JsonApiSerializer::Model
+        attributes :id, :title, :body
+      end
+
+      let!(:post1) { Post.create!(title: 'post1 title', body: 'post1 body') }
+      let!(:post2) { Post.create!(title: 'post2 title', body: 'post2 body') }
+
+      subject(:serializer) { JsonApiSerializer::Collection.new([ post1, post2 ]) }
+
+      let(:expected_payload) do
+        {
+          data: [
+            {
+              type: "posts",
+              id: post1.id,
+              attributes: {
+                title: post1.title,
+                body: post1.body
+              },
+            },
+            {
+              type: "posts",
+              id: post2.id,
+              attributes: {
+                title: post2.title,
+                body: post2.body
+              },
+            }
+          ]
+        }
+      end
+
+      it "generates a JSON-API-compliant payload" do
+        expect(JsonApiSerializer::Collection).to receive(:serializer_for).with(Post).and_return(PostSerializerSimple).twice
+        expect(serializer.as_json).to eq(expected_payload)
+      end
+    end
+
+    context "collection with relationships and includes" do
+      class PostSerializerWithRelsAndIncludes < JsonApiSerializer::Model
+        attributes :id, :title, :body
+
+        has_one :author, include: true
+      end
+
+      class AuthorSerializerWithRelsAndIncludes < JsonApiSerializer::Model
+        attributes :name, :email
+
+        has_many :posts, include: true
+      end
+
+      let(:author) { Author.create!(name: 'fred', email: 'fred@flintstone.org') }
+
+      let!(:post1) { Post.create!(title: 'post1 title', body: 'post1 body', author: author) }
+      let!(:post2) { Post.create!(title: 'post2 title', body: 'post2 body', author: author) }
+
+      subject(:serializer) { JsonApiSerializer::Collection.new([ post1, post2 ]) }
+
+      let(:expected_payload) do
+        {
+          data: [
+            {
+              type: "posts",
+              id: post1.id,
+              attributes: {
+                title: post1.title,
+                body: post1.body
+              },
+              relationships: {
+                author: {
+                  data: { id: author.id, type: "authors" }
+                }
+              }
+            },
+            {
+              type: "posts",
+              id: post2.id,
+              attributes: {
+                title: post2.title,
+                body: post2.body
+              },
+              relationships: {
+                author: {
+                  data: { id: author.id, type: "authors" }
+                }
+              }
+            }
+          ],
+          included: [
+            {
+              type: "authors",
+              id: author.id,
+              attributes: {
+                name: author.name,
+                email: author.email
+              },
+              relationships: {
+                posts: {
+                  data: [
+                    { id: post1.id, type: "posts" },
+                    { id: post2.id, type: "posts" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      end
+
+      it "generates a JSON-API-compliant payload" do
+        expect(JsonApiSerializer::Base).to receive(:serializer_for).with(Post).and_return(PostSerializerWithRelsAndIncludes).twice
+        expect(JsonApiSerializer::Base).to receive(:serializer_for).with(Author).and_return(AuthorSerializerWithRelsAndIncludes).once
+        expect(serializer.as_json).to eq(expected_payload)
       end
     end
   end
