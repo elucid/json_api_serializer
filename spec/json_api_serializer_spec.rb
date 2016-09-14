@@ -10,6 +10,8 @@ describe JsonApiSerializer do
     expect{ Post }.to_not raise_exception
   end
 
+  # TODO: describe JsonApiSerializer::Collection
+
   describe JsonApiSerializer::Model do
     context "resource identifier object default" do
       let(:author) { Author.create!(name: 'fred', email: 'fred@flintstone.org') }
@@ -56,6 +58,10 @@ describe JsonApiSerializer do
         expect(serializer.as_json).to eq(expected_payload)
       end
     end
+
+    context "scope"
+
+    context "include helpers"
 
     context "virtual attributes" do
       class AuthorFigSerializer < JsonApiSerializer::Model
@@ -237,6 +243,66 @@ describe JsonApiSerializer do
       end
     end
 
-    context "included relationships"
+    context "included relationships" do
+      context "has_one" do
+        class PostSerializerWithAuthorIncluded < JsonApiSerializer::Model
+          attributes :title, :body
+
+          has_one :author, include: true
+        end
+
+        class AuthorSerializerForInclude < JsonApiSerializer::Model
+          attributes :name, :email
+
+          has_many :posts
+        end
+
+        let(:author) { Author.create!(name: 'fred', email: 'fred@flintstone.org') }
+
+        let(:post) { Post.create!(title: 'post title', body: 'post body', author: author) }
+
+        subject(:serializer) { PostSerializerWithAuthorIncluded.new(post) }
+
+        let(:expected_payload) do
+          {
+            data: {
+              type: "posts",
+              id: post.id,
+              attributes: {
+                title: post.title,
+                body: post.body
+              },
+              relationships: {
+                author: {
+                  data: { id: author.id, type: "authors" }
+                }
+              }
+            },
+            included: [
+              {
+                type: "authors",
+                id: author.id,
+                attributes: {
+                  name: author.name,
+                  email: author.email
+                },
+                relationships: {
+                  posts: {
+                    data: [
+                      { id: post.id, type: "posts" }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        end
+
+        it "generates a JSON-API-compliant payload" do
+          expect(PostSerializerWithAuthorIncluded).to receive(:serializer_for).with(Author).and_return(AuthorSerializerForInclude)
+          expect(serializer.as_json).to eq(expected_payload)
+        end
+      end
+    end
   end
 end
