@@ -44,15 +44,21 @@ module JsonApiSerializer
     end
 
     def self.serializer_for(factory)
-      serializer =
-        if "".respond_to?(:safe_constantize)
-          "#{factory.name}Serializer".safe_constantize
-        else
-          begin
-            "#{factory.name}Serializer".constantize
-          rescue NameError => e
-            raise unless e.message =~ /uninitialized constant/
-          end
+      @_serializer_cache ||= {}
+      @_serializer_cache[factory] ||=
+        begin
+          serializer =
+            if "".respond_to?(:safe_constantize)
+              "#{factory.name}Serializer".safe_constantize
+            else
+              begin
+                "#{factory.name}Serializer".constantize
+              rescue NameError => e
+                raise unless e.message =~ /uninitialized constant/
+              end
+            end
+
+          serializer || JsonApiSerializer::Model
         end
 
       serializer || JsonApiSerializer::Model
