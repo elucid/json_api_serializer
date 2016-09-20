@@ -60,8 +60,15 @@ module JsonApiSerializer
 
           serializer || JsonApiSerializer::Model
         end
+    end
 
-      serializer || JsonApiSerializer::Model
+    def has_many_fk(name)
+      self.class.has_many_fk(name)
+    end
+
+    def self.has_many_fk(name)
+      @_has_many_fk_cache ||= {}
+      @_has_many_fk_cache[name] ||= "#{name.to_s.singularize}_ids"
     end
 
     def type_for_name(name)
@@ -179,7 +186,7 @@ module JsonApiSerializer
             _jas_resource_object_cache[key] ||= rel_serializer.resource_object
           end
         when [ :has_many, false ]
-          rel_fk = "#{rel.name.to_s.singularize}_ids"
+          rel_fk = has_many_fk(rel.name)
           association_loaded =
             begin
               object.association(rel.name).loaded?
