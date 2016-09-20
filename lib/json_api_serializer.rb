@@ -92,6 +92,16 @@ module JsonApiSerializer
   end
 
   class Model < Base
+    def self.define_include_method(name)
+      method = "include_#{name}?".to_sym
+
+      unless method_defined?(method)
+        define_method method do
+          true
+        end
+      end
+    end
+
     def self.attributes(*attrs)
       @attributes ||= []
 
@@ -110,9 +120,27 @@ module JsonApiSerializer
 
           add_relationship Relationship.new(resource_name, :has_many, {})
         else
+          unless method_defined?(attr)
+            define_method attr do
+              object.send(attr)
+            end
+          end
+
+          define_include_method(attr)
+
           @attributes << attr
         end
       end
+
+      # NOTE: technique stolen from AMS 0.8
+      # protect inheritance chains and open classes
+      # if a serializer inherits from another OR
+      #  attributes are added later in a classes lifecycle
+      # poison the cache
+      define_method :_fast_attributes do
+        raise NameError
+      end
+
     end
 
     def self.relationships
@@ -147,16 +175,28 @@ module JsonApiSerializer
       _jas_resource_object_cache[key] ||= resource_object
     end
 
+    # NOTE: technique stolen from AMS 0.8
     def attributes
-      @_attributes ||= self.class.attributes.inject({}) do |attrs, a|
-        include_helper = "include_#{a}?"
+      _fast_attributes
 
-        unless respond_to?(include_helper) && !send(include_helper)
-          attrs[a] = respond_to?(a) ? send(a) : object.send(a)
-        end
+      rescue NameError
 
-        attrs
+      method = "def _fast_attributes\n"
+      method << "  @_attributes ||=\n"
+      method << "    begin\n"
+      method << "      h = {}\n"
+
+      self.class.attributes.each do |name|
+        method << "      h[:\"#{name}\"] = send(:\"#{name}\") if include_#{name}?\n"
       end
+
+      method << "      h\n"
+      method << "    end\n"
+      method << "end"
+
+      self.class.class_eval method
+
+      _fast_attributes
     end
 
     def relationships
