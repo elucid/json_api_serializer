@@ -203,74 +203,27 @@ module JsonApiSerializer
       @_relationships ||= self.class.relationships.inject({}) do |rels, rel|
         case [ rel.type, !!rel.options[:include] ]
         when [ :has_one_id, false ]
-          rel_fk = "#{rel.name}_id"
-          rel_id = object.send(rel_fk)
-          rel_type = type_for_name(rel.name)
-          rel_resource_identifier_object = { id: rel_id, type: rel_type }
+          rel_resource_identifier_object = _has_one_id(rel)
 
           rels[rel.name] = { data: rel_resource_identifier_object }
         when [ :has_one, false ]
-          rel_object = object.send(rel.name)
-          rel_id = rel_object.id
-          rel_type = type_for_name(rel_object.class.name)
-          rel_resource_identifier_object = { id: rel_id, type: rel_type }
+          rel_resource_identifier_object = _has_one_without_sideload(rel)
 
           rels[rel.name] = { data: rel_resource_identifier_object }
         when [ :has_one, true ]
-          rel_object = object.send(rel.name)
-          rel_id = rel_object.id
-          rel_class = rel_object.class
-          rel_type = type_for_name(rel_class.name)
-          rel_resource_identifier_object = { id: rel_id, type: rel_type }
+          rel_resource_identifier_object = _has_one_with_sideload(rel)
+
           rels[rel.name] = { data: rel_resource_identifier_object }
-
-          key = [ rel_id, rel_class ]
-
-          unless _jas_included_set.include?(key) || _jas_data_set.include?(key)
-            _jas_included_set.add(key)
-            rel_serializer = serializer_for(rel_class).new(rel_object, options)
-            _jas_resource_object_cache[key] ||= rel_serializer.resource_object
-          end
         when [ :has_many_ids, false ]
-          rel_fk = has_many_fk(rel.name)
-
-          rel_ids = object.send(rel_fk)
-
-          rel_type = type_for_name(rel.name)
-          rel_resource_identifier_objects = rel_ids.map do |rel_id|
-            { id: rel_id, type: rel_type }
-          end
+          rel_resource_identifier_objects = _has_many_ids(rel)
 
           rels[rel.name] = { data: rel_resource_identifier_objects }
         when [ :has_many, false ]
-          rel_objects = object.send(rel.name)
-
-          rel_resource_identifier_objects = rel_objects.map do |rel_object|
-            rel_id = rel_object.id
-            rel_type = type_for_name(rel_object.class.name)
-
-            { id: rel_id, type: rel_type }
-          end
+          rel_resource_identifier_objects = _has_many_without_sideload(rel)
 
           rels[rel.name] = { data: rel_resource_identifier_objects }
         when [ :has_many, true ]
-          rel_objects = object.send(rel.name)
-
-          rel_resource_identifier_objects = rel_objects.map do |rel_object|
-            rel_id = rel_object.id
-            rel_class = rel_object.class
-            rel_type = type_for_name(rel_class.name)
-
-            key = [ rel_id, rel_class ]
-
-            unless _jas_included_set.include?(key) || _jas_data_set.include?(key)
-              _jas_included_set.add(key)
-              rel_serializer = serializer_for(rel_class).new(rel_object, options)
-              _jas_resource_object_cache[key] ||= rel_serializer.resource_object
-            end
-
-            { id: rel_id, type: rel_type }
-          end
+          rel_resource_identifier_objects = _has_many_with_sideload(rel)
 
           rels[rel.name] = { data: rel_resource_identifier_objects }
         end
@@ -289,6 +242,82 @@ module JsonApiSerializer
       @relationships ||= []
 
       @relationships << relationship
+    end
+
+    def _has_one_id(rel)
+      rel_fk = "#{rel.name}_id"
+      rel_id = object.send(rel_fk)
+      rel_type = type_for_name(rel.name)
+
+      { id: rel_id, type: rel_type }
+    end
+
+    def _has_one_without_sideload(rel)
+      rel_object = object.send(rel.name)
+      rel_id = rel_object.id
+      rel_type = type_for_name(rel_object.class.name)
+
+      { id: rel_id, type: rel_type }
+    end
+
+    def _has_one_with_sideload(rel)
+      rel_object = object.send(rel.name)
+      rel_id = rel_object.id
+      rel_class = rel_object.class
+      rel_type = type_for_name(rel_class.name)
+
+      key = [ rel_id, rel_class ]
+
+      unless _jas_included_set.include?(key) || _jas_data_set.include?(key)
+        _jas_included_set.add(key)
+        rel_serializer = serializer_for(rel_class).new(rel_object, options)
+        _jas_resource_object_cache[key] ||= rel_serializer.resource_object
+      end
+
+      { id: rel_id, type: rel_type }
+    end
+
+    def _has_many_ids(rel)
+      rel_fk = has_many_fk(rel.name)
+
+      rel_ids = object.send(rel_fk)
+
+      rel_type = type_for_name(rel.name)
+
+      rel_ids.map do |rel_id|
+        { id: rel_id, type: rel_type }
+      end
+    end
+
+    def _has_many_without_sideload(rel)
+      rel_objects = object.send(rel.name)
+
+      rel_objects.map do |rel_object|
+        rel_id = rel_object.id
+        rel_type = type_for_name(rel_object.class.name)
+
+        { id: rel_id, type: rel_type }
+      end
+    end
+
+    def _has_many_with_sideload(rel)
+      rel_objects = object.send(rel.name)
+
+      rel_objects.map do |rel_object|
+        rel_id = rel_object.id
+        rel_class = rel_object.class
+        rel_type = type_for_name(rel_class.name)
+
+        key = [ rel_id, rel_class ]
+
+        unless _jas_included_set.include?(key) || _jas_data_set.include?(key)
+          _jas_included_set.add(key)
+          rel_serializer = serializer_for(rel_class).new(rel_object, options)
+          _jas_resource_object_cache[key] ||= rel_serializer.resource_object
+        end
+
+        { id: rel_id, type: rel_type }
+      end
     end
   end
 end
