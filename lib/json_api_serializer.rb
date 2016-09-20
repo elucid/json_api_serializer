@@ -63,6 +63,15 @@ module JsonApiSerializer
 
       serializer || JsonApiSerializer::Model
     end
+
+    def type_for_name(name)
+      self.class.type_for_name(name)
+    end
+
+    def self.type_for_name(name)
+      @_type_name_cache ||= {}
+      @_type_name_cache[name] ||= name.to_s.downcase.pluralize
+    end
   end
 
   class Collection < Base
@@ -149,16 +158,16 @@ module JsonApiSerializer
         when [ :has_one, false ]
           rel_fk = "#{rel.name}_id"
           rel_id = object.respond_to?(rel_fk) ? object.send(rel_fk) : object.send(rel.name).id
-          rel_type = rel.name.to_s.pluralize
+          rel_type = type_for_name(rel.name)
           rel_resource_identifier_object = { id: rel_id, type: rel_type }
 
           rels[rel.name] = { data: rel_resource_identifier_object }
         when [ :has_one, true ]
-          rel_type = rel.name.to_s.pluralize
+          rel_type = type_for_name(rel.name)
           rel_object = object.send(rel.name)
           rel_id = rel_object.id
           rel_class = rel_object.class
-          rel_type = rel.name.to_s.pluralize
+          rel_type = type_for_name(rel.name)
           rel_resource_identifier_object = { id: rel_id, type: rel_type }
           rels[rel.name] = { data: rel_resource_identifier_object }
 
@@ -187,7 +196,7 @@ module JsonApiSerializer
               object.send(rel.name).map(&:id)
             end
 
-          rel_type = rel.name.to_s.pluralize
+          rel_type = type_for_name(rel.name)
           rel_resource_identifier_objects = rel_ids.map do |rel_id|
             { id: rel_id, type: rel_type }
           end
@@ -199,7 +208,7 @@ module JsonApiSerializer
           rel_resource_identifier_objects = rel_objects.map do |rel_object|
             rel_id = rel_object.id
             rel_class = rel_object.class
-            rel_type = rel_class.name.to_s.downcase.pluralize
+            rel_type = type_for_name(rel_class.name)
 
             key = [ rel_id, rel_class ]
 
@@ -222,7 +231,7 @@ module JsonApiSerializer
     private
 
     def resource_type
-      object.class.name.downcase.pluralize
+      type_for_name(object.class.name)
     end
 
     def self.add_relationship(relationship)
