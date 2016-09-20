@@ -114,11 +114,11 @@ module JsonApiSerializer
         when /_id$/
           resource_name = attr.to_s.sub(/_id$/, '').to_sym
 
-          add_relationship Relationship.new(resource_name, :has_one, {})
+          add_relationship Relationship.new(resource_name, :has_one_id, {})
         when /_ids$/
           resource_name = attr.to_s.sub(/_ids$/, '').pluralize.to_sym
 
-          add_relationship Relationship.new(resource_name, :has_many, {})
+          add_relationship Relationship.new(resource_name, :has_many_ids, {})
         else
           unless method_defined?(attr)
             define_method attr do
@@ -202,19 +202,25 @@ module JsonApiSerializer
     def relationships
       @_relationships ||= self.class.relationships.inject({}) do |rels, rel|
         case [ rel.type, !!rel.options[:include] ]
-        when [ :has_one, false ]
+        when [ :has_one_id, false ]
           rel_fk = "#{rel.name}_id"
-          rel_id = object.respond_to?(rel_fk) ? object.send(rel_fk) : object.send(rel.name).id
+          rel_id = object.send(rel_fk)
           rel_type = type_for_name(rel.name)
           rel_resource_identifier_object = { id: rel_id, type: rel_type }
 
           rels[rel.name] = { data: rel_resource_identifier_object }
+        when [ :has_one, false ]
+          rel_object = object.send(rel.name)
+          rel_id = rel_object.id
+          rel_type = type_for_name(rel_object.class.name)
+          rel_resource_identifier_object = { id: rel_id, type: rel_type }
+
+          rels[rel.name] = { data: rel_resource_identifier_object }
         when [ :has_one, true ]
-          rel_type = type_for_name(rel.name)
           rel_object = object.send(rel.name)
           rel_id = rel_object.id
           rel_class = rel_object.class
-          rel_type = type_for_name(rel.name)
+          rel_type = type_for_name(rel_class.name)
           rel_resource_identifier_object = { id: rel_id, type: rel_type }
           rels[rel.name] = { data: rel_resource_identifier_object }
 
@@ -225,26 +231,24 @@ module JsonApiSerializer
             rel_serializer = serializer_for(rel_class).new(rel_object, options)
             _jas_resource_object_cache[key] ||= rel_serializer.resource_object
           end
-        when [ :has_many, false ]
+        when [ :has_many_ids, false ]
           rel_fk = has_many_fk(rel.name)
-          association_loaded =
-            begin
-              object.association(rel.name).loaded?
-            rescue ActiveRecord::AssociationNotFoundError
-            end
 
-          rel_ids =
-            case
-            when association_loaded # avoids forcing extra query if association loaded
-              object.send(rel.name).map(&:id)
-            when object.respond_to?(rel_fk) # avoids loading association if not loaded
-              object.send(rel_fk)
-            else # just have to suck it up and load the association
-              object.send(rel.name).map(&:id)
-            end
+          rel_ids = object.send(rel_fk)
 
           rel_type = type_for_name(rel.name)
           rel_resource_identifier_objects = rel_ids.map do |rel_id|
+            { id: rel_id, type: rel_type }
+          end
+
+          rels[rel.name] = { data: rel_resource_identifier_objects }
+        when [ :has_many, false ]
+          rel_objects = object.send(rel.name)
+
+          rel_resource_identifier_objects = rel_objects.map do |rel_object|
+            rel_id = rel_object.id
+            rel_type = type_for_name(rel_object.class.name)
+
             { id: rel_id, type: rel_type }
           end
 
