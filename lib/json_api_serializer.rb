@@ -77,7 +77,7 @@ module JsonApiSerializer
 
     def self.type_for_name(name)
       @_type_name_cache ||= {}
-      @_type_name_cache[name] ||= name.to_s.downcase.pluralize
+      @_type_name_cache[name] ||= name.to_s.underscore.pluralize
     end
   end
 
