@@ -87,6 +87,39 @@ describe JsonApiSerializer do
       end
     end
 
+    context "include helpers for relationships" do
+      class AuthorSerializerWithConditionalPosts < JsonApiSerializer::Model
+        attributes :id, :name, :email
+
+        has_many :posts
+
+        def include_posts?
+          false
+        end
+      end
+
+      let(:author) { Author.create!(name: 'fred', email: 'fred@flintstone.org') }
+
+      subject(:serializer) { AuthorSerializerWithConditionalPosts.new(author) }
+
+      let(:expected_payload) do
+        {
+          data: {
+            type: "authors",
+            id: author.id,
+            attributes: {
+              name: author.name,
+              email: author.email
+            }
+          }
+        }
+      end
+
+      it "generates a JSON-API-compliant payload" do
+        expect(serializer.as_json).to eq(expected_payload)
+      end
+    end
+
     context "scope" do
       class AuthorSerializerWithScopeConditionalAttributes < JsonApiSerializer::Model
         attributes :id, :name, :email

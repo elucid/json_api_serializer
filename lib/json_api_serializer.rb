@@ -201,6 +201,8 @@ module JsonApiSerializer
 
     def relationships
       @_relationships ||= self.class.relationships.inject({}) do |rels, rel|
+        return rels unless send("include_#{rel.name}?")
+
         case [ rel.type, !!rel.options[:include] ]
         when [ :has_one_id, false ]
           rel_resource_identifier_object = _has_one_id(rel)
@@ -240,6 +242,8 @@ module JsonApiSerializer
 
     def self.add_relationship(relationship)
       @relationships ||= []
+
+      define_include_method(relationship.name)
 
       @relationships << relationship
     end
